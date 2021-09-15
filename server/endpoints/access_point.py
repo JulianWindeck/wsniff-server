@@ -101,9 +101,7 @@ def add_discovery(mac:str):
     except ValidationError as e:
         return jsonify(e.messages), 400
 
-    if str(discovery.access_point_mac) != mac:
-        return jsonify({'message': 'MAC of URL and input data do not match.',
-                        'vergleich':f"{mac} <-> {discovery.access_point_mac}"})
+    discovery.access_point_mac = mac
     
     #as foreign key we can use the current user object
     discovery.sniffer_id = g.current_user.id

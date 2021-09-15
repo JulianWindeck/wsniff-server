@@ -65,7 +65,7 @@ class DiscoverySchema(ma.SQLAlchemyAutoSchema):
         #fields to exclude (entirely/when producing JSON output/when parsing incoming data)
         exclude=['sniffer_id']
         load_only = []
-        dump_only = []
+        dump_only = ['sniffer', 'access_point_mac']
 
     sniffer = fields.Nested(SnifferSchema, exclude=['discoveries', 'maps'])
     

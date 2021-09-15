@@ -32,6 +32,22 @@ def home(p='/'):
     })
 
 
+@system.route('/availability', methods=['GET', 'POST'])
+def is_available():
+    """
+    Should be used to check with wsniff client whether the server is currently available
+    The client should send a JSON message {'message': 'ping'} to which the server responds
+    with {'message': 'pong'}
+    """
+    data = request.get_json()
+    #actually we don't check whether the message sent here is 'ping' since it is unnessary
+    #but it would be nice if you do :)
+    if not data or not data.get('message'):
+        return jsonify({'message': 'Please send me a "ping" message.'}), 400
+    
+    return jsonify({'message': 'pong'}), 200
+
+
 @system.route('/login')
 def login():
     auth = request.authorization
