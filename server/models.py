@@ -65,7 +65,7 @@ class AccessPoint(db.Model):
 
     #a SSID has a max length of 32 characters, but we intentionally drop that constraint
     #to be open for changes
-    ssid = db.Column(db.String(64))
+    last_ssid = db.Column(db.String(64))
 
     #these are derived values we could also compute using a join with the discovery table
     #but for performance issues we allow a little bit redundance
@@ -74,12 +74,33 @@ class AccessPoint(db.Model):
     #the last channel this AP was seen on
     last_channel = db.Column(db.Integer, nullable=False)
 
+    gps_lat = db.Column(db.Float, nullable=False)
+    gps_lon = db.Column(db.Float, nullable=False)
+
     #all the wardriving maps this AP is part of
     maps = db.relationship('WardrivingMap', secondary=part_of, back_populates='access_points')
 
     #the different occurrences this AP was discovered
     discoveries = db.relationship('Discovery', back_populates='access_point')
 
+    def update(self, discovery):
+        """
+        Update all the values of the AP with the new information of this discovery.
+
+        WARNING: you still have to call session.add(ap) and commit() to apply these changes to the DB!
+        """
+        #WARNING: don't try to add the discovery to the list of this AP's discoveries here since it 
+        #will complicate things unneccessarily
+
+        #update values
+        self.last_ssid = discovery.ssid
+        self.t_last_seen = discovery.timestamp
+        self.last_encryption = discovery.encryption
+        self.last_channel = discovery.channel
+        #you could also directly compute a better approximation with the values of all discoveries
+        #(signal_stregths and gps values) here
+        self.gps_lat = discovery.gps_lat
+        self.gps_lon = discovery.gps_lon
 
     
 
@@ -90,7 +111,7 @@ class Discovery(db.Model):
     #discovery should be a weak entity type, so the existance of its entities depends on 
     #the existance of the corresponding AP entities 
     #(this should be part of the primary key if modelled correctly, but there are conflicts with some DBMS)
-    access_point_mac = db.Column(db.Integer, db.ForeignKey('access_point.mac', ondelete='CASCADE'))
+    access_point_mac = db.Column(db.Integer, db.ForeignKey('access_point.mac', ondelete='CASCADE'), nullable=False)
    
     #this should be a partial key but some DBS don't support autoincrement when using composite keys
     id = db.Column(db.Integer, primary_key=True)
@@ -99,9 +120,11 @@ class Discovery(db.Model):
     channel = db.Column(db.Integer, nullable=False)
     encryption = db.Column(db.Integer, nullable=False)
     #this is the maximum RSSI the sniffer got during the timespan he saw the AP
-    signal_stregth = db.Column(db.Integer, nullable=False)
+    signal_strength = db.Column(db.Integer, nullable=False)
+
+    ssid = db.Column(db.String(64))
     
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, nullable=False)
     #gps data: latitude and longitude when the sniffer had the highest signal strength
     #(and was therefore closest to the AP)
     gps_lat = db.Column(db.Float, nullable=False)

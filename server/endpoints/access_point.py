@@ -11,52 +11,56 @@ aps = Blueprint('aps', __name__, url_prefix='/aps')
 
 
 ###############################################AccessPoints#######################################
-"""
-Get all Access Points (without their discoveries)
-"""
+
 @aps.route('', methods=['GET'])
 @login_required
 def get_all_aps():
+    """
+    Get all Access Points (without their discoveries)
+    """
     aps = AccessPoint.query.all()
 
     output = aps_schema.dump(aps)
     return jsonify({'aps': output})
 
-"""
-Create a new Access Point
-"""
-@aps.route('', methods=['POST'])
-@login_required
-def create_ap():
-    try: 
-        ap = ap_schema.load(request.get_json())
-    except ValidationError as e:
-        return jsonify(e.messages), 400
+#it makes no sense to be able to add an access point directly via the API
+# """
+# Create a new Access Point
+# """
+# @aps.route('', methods=['POST'])
+# @login_required
+# def create_ap():
+#     try: 
+#         ap = ap_schema.load(request.get_json())
+#     except ValidationError as e:
+#         return jsonify(e.messages), 400
 
-    try:
-        db.session.add(ap)
-        db.session.commit()
-    except exc.IntegrityError as e:
-        return jsonify({'message': 'Integrity error occured.'}), 400
+#     try:
+#         db.session.add(ap)
+#         db.session.commit()
+#     except exc.IntegrityError as e:
+#         return jsonify({'message': 'Integrity error occured.'}), 400
 
-    return jsonify({'message': 'New access point created.'})
+#     return jsonify({'message': 'New access point created.'})
 
-"""
-Retrieve the information of a single AP,
-INCLUDING all discoveries linked to that AP
-"""
+
 @aps.route('/<mac>', methods=['GET'])
 @login_required
 def get_ap(mac):
+    """
+    Retrieve the information of a single AP,
+    INCLUDING all discoveries linked to that AP
+    """
     ap = AccessPoint.query.filter_by(mac=mac).first_or_404()
 
     return jsonify({'ap': ap_schema.dump(ap)})              
 
 
-"""Update access point"""
+#TODO: does this route really make sense? maybe we should remove it
 @aps.route('/<mac>', methods=['PUT'])
 @login_required
 def update_ap(mac):
+    """Update access point"""
     ap = AccessPoint.query.filter_by(mac=mac).first_or_404()
 
     try:
@@ -73,6 +77,10 @@ def update_ap(mac):
 @aps.route('/<mac>', methods=['DELETE'])
 @login_required
 def delete_ap(mac):
+    """
+    Deleting an AP means all its discoveries will also be deleted if the foreign key constraints
+    are enforced correctly.
+    """
     ap = AccessPoint.query.filter_by(mac=mac).first_or_404()
 
     db.session.delete(ap)
@@ -83,17 +91,14 @@ def delete_ap(mac):
 #################################################DISCOVERIES######################################
 
 
-"""
-Add a discovery for the Access Point with MAC address <mac> 
-If there is no corresponding Access Point for this discovery, a new AP is also created in the process.
-"""
-@aps.route('/<mac>', methods=['POST'])
+
+@aps.route('', methods=['POST'])
 @login_required
-def add_discovery(mac:str):
-    #check whether there is an AP with this mac
-    ap = AccessPoint.query.filter_by(mac=mac).first()
-    if not ap:
-        return jsonify({'message': 'You have to add a corresponding AP first.'}), 404
+def add_discovery():
+    """
+    Add a discovery for the Access Point with MAC address <mac> 
+    If there is no corresponding Access Point for this discovery, a new AP is also created in the process.
+    """
 
     #load Discovery object from JSON input
     try:
@@ -101,22 +106,48 @@ def add_discovery(mac:str):
     except ValidationError as e:
         return jsonify(e.messages), 400
 
-    discovery.access_point_mac = mac
+
+    #if this is the first time the AP is discovered, add the AP
+    #check whether there already is an AP with this mac
+    ap = AccessPoint.query.filter_by(mac=discovery.access_point_mac).first()
+
+    if ap:
+        #if there is, add this discovery to the ap
+        #and update the values of the AP
+        ap.update(discovery)
+    
+    #if this is the first time the AP is discovered
+    else:
+        ap = AccessPoint(mac=discovery.access_point_mac)
+        ap.update(discovery)
+
+        try:
+            db.session.add(ap)
+            db.session.commit()
+        except exc.IntegrityError as e:
+            return jsonify({'message': 'Integrity error occured when adding AP.'}), 400
     
     #as foreign key we can use the current user object
     discovery.sniffer_id = g.current_user.id
+    #set the AP of this discovery
+    discovery.access_point = ap
 
     try:
         db.session.add(discovery)
         db.session.commit()
     except exc.IntegrityError as e:
-        return jsonify({'message': 'Integrity error occured.'}), 400
+        return jsonify({'message': 'Integrity error occured when adding discovery.'}), 400
 
     return jsonify({'message': 'New discovery was added.'})
+
 
 @aps.route('/<mac>/<discovery_id>', methods=['DELETE'])
 @login_required
 def delete_discovery(mac, discovery_id):
+    """
+    Delete a single discovery of an AP. Does not mean the AP will be deleted even if it is 
+    the last discovery left of this AP (TODO).
+    """
     dis = Discovery.query.filter_by(id=discovery_id).first_or_404()
 
     db.session.delete(dis)
@@ -124,11 +155,13 @@ def delete_discovery(mac, discovery_id):
 
     return jsonify({'message': 'Discovery has been deleted.'})
 
-"""
-Show all discoveries. Primarily intended for debugging.
-"""
+
 @aps.route('/*', methods=['GET'])
 @login_required
 def get_all_discoveries():
+    """
+    Show all discoveries. Primarily intended for debugging.
+    """
+
     discoveries = Discovery.query.all()
     return jsonify({'discoveries': discoveries_schema.dump(discoveries)})

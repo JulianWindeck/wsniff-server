@@ -65,7 +65,7 @@ class DiscoverySchema(ma.SQLAlchemyAutoSchema):
         #fields to exclude (entirely/when producing JSON output/when parsing incoming data)
         exclude=['sniffer_id']
         load_only = []
-        dump_only = ['sniffer', 'access_point_mac']
+        dump_only = ['sniffer']
 
     sniffer = fields.Nested(SnifferSchema, exclude=['discoveries', 'maps'])
     
@@ -83,7 +83,7 @@ class AccessPointSchema(ma.SQLAlchemyAutoSchema):
         load_instance = True
         #fields to exclude (entirely/when producing JSON output/when parsing incoming data)
         exclude=[]
-        load_only = ['id']
+        load_only = []
         dump_only = []
     
     #you don't need to transfer 'access_point_mac' since the mac is already part of the AP itself
