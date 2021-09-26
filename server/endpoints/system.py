@@ -50,6 +50,11 @@ def is_available():
 
 @system.route('/login')
 def login():
+    """
+    User can log in providing his username and password.
+    Basic auth is then used to autheticate. The user gets a reply containing the
+    token with which he can prove his/her identity is subsequent calls.
+    """
     auth = request.authorization
 
     #authetication information is missing

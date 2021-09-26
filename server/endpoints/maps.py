@@ -12,33 +12,36 @@ maps = Blueprint('maps', __name__, url_prefix='/maps')
 
 ###############################################ROUTES########################################
 
-"""
-Get all maps
-"""
+
 @maps.route('', methods=['GET'])
 @login_required
 def get_all_maps():
+    """
+    Get all maps
+    """
     maps = WardrivingMap.query.all()
 
     output = maps_schema.dump(maps)
     return jsonify({'maps': output})
 
-"""
-Retrieve the information of a single map
-"""
+
 @maps.route('/<id>', methods=['GET'])
 @login_required
 def get_map(id):
+    """
+    Retrieve the information of a single map
+    """
     ap = WardrivingMap.query.filter_by(id=id).first_or_404()
 
     return jsonify({'map': map_schema.dump(ap)}) 
 
-"""
-Create a new map
-"""
+
 @maps.route('', methods=['POST'])
 @login_required
 def create_map():
+    """
+    Create a new map
+    """
     try: 
         map = map_schema.load(request.get_json())
     except ValidationError as e:
@@ -53,12 +56,13 @@ def create_map():
     return jsonify({'message': 'New map created.'})
 
 
-"""
-Update map information
-"""
+
 @maps.route('/<id>', methods=['PUT'])
 @login_required
 def update_map(id):
+    """
+    Update map information
+    """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
 
     try:
@@ -76,13 +80,14 @@ def update_map(id):
     return jsonify({'message': 'Map has been updated.'})
 
 
-"""
-Add a list of Access Points to map <id>
-Expects a list of <mac>-IDs which belong to the APs as JSON input.
-"""
+
 @maps.route('/<id>/aps', methods=['POST'])
 @login_required
 def add_ap(id):
+    """
+    Add a list of Access Points to map <id>
+    Expects a list of <mac>-IDs which belong to the APs as JSON input.
+    """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
 
     input = request.get_json()
@@ -102,21 +107,48 @@ def add_ap(id):
     return jsonify({'message': 'Added access points to map.'}), 200
 
 
-"""
-Get all contributing sniffers of this map
-"""
+@maps.route('/<id>/aps', methods=['GET'])
+@login_required
+def get_aps(id):
+    """
+    Returns all APs that belong to this map that are within the rectangle defined by 
+    [lat1, lon1] and [lat2, lon2]
+    """
+    map = WardrivingMap.query.filter_by(id=id).first_or_404()
+
+    #get query parameters
+    lat1, lat2 = request.args.get('lat1'), request.args.get('lat2')
+    lon1, lon2 = request.args.get('lon1'), request.args.get('lon2')
+
+    if not (lat1 and lat2 and lon1 and lon2):
+        return jsonify({'message', 'Please provide lat and lon values'}), 400
+
+    lat_min, lon_min = min(lat1, lat2), min(lon1, lon2)
+    lat_max, lon_max = max(lat1, lat2), max(lon1, lon2)
+
+    AccessPoint.query.join(AccessPoint.maps).filter(WardrivingMap.id == id) \
+        .filter(AccessPoint.lat <= lat_max, AccessPoint.lat >= lat_min,
+                AccessPoint.lon <= lon_max, AccessPoint.lon >= lon_min).all()
+    return
+
+
+
 @maps.route('/<id>/sniffers', methods=['GET'])
 @login_required
 def get_all_sniffers(id):
-   map = WardrivingMap.query.filter_by(id=id).first_or_404() 
-   return jsonify({'sniffers': sniffers_schema.dump(map.sniffers)})
+    """
+    Get all contributing sniffers of this map
+    """
+    map = WardrivingMap.query.filter_by(id=id).first_or_404() 
+    return jsonify({'sniffers': sniffers_schema.dump(map.sniffers)})
 
-"""
-Add the current sniffer as a contributer to this map
-"""
+
 @maps.route('/<id>/sniffers', methods=['POST'])
 @login_required
 def add_sniffer(id):
+    """
+    Add the current sniffer as a contributer to this map
+    """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
 
     print(g.current_user.id)
