@@ -3,7 +3,7 @@ from sqlalchemy import exc
 from marshmallow import ValidationError
 
 from server import db
-from server.models import AccessPoint, WardrivingMap, Sniffer
+from server.models import AccessPoint, WardrivingMap, Sniffer, Map_StringEAV
 from server.endpoints.api_definition import map_schema, maps_schema, sniffers_schema
 from server.login import login_required
 
@@ -17,7 +17,7 @@ maps = Blueprint('maps', __name__, url_prefix='/maps')
 @login_required
 def get_all_maps():
     """
-    Get all maps
+    Get all maps including their generic eav attributes
     """
     maps = WardrivingMap.query.all()
 
@@ -29,7 +29,7 @@ def get_all_maps():
 @login_required
 def get_map(id):
     """
-    Retrieve the information of a single map
+    Retrieve the information of a single map (including the generic eav attributes)
     """
     ap = WardrivingMap.query.filter_by(id=id).first_or_404()
 
@@ -79,6 +79,32 @@ def update_map(id):
 
     return jsonify({'message': 'Map has been updated.'})
 
+@maps.route('/<id>/meta', methods=["POST"])
+@login_required
+def add_map_metadata(id):
+    """
+    Dynamically add map attributes
+    """
+    map = WardrivingMap.query.filter_by(id=id).first_or_404()
+    
+    #get post data
+    input = request.get_json(silent=True)
+    if not input:
+        return jsonify({'message': 'You have to provide an attribute and a value.'}), 400
+    attribute = input.get('attribute')
+    value = input.get('value')
+    if not (attribute and value):
+        return jsonify({'message': 'You have to provide an attribute and a value.'}), 400
+
+    #add attribute to map
+    eav = Map_StringEAV(map_id=id, attribute=attribute, value=value)
+    try:
+        db.session.add(eav)
+        db.session.commit()
+    except exc.IntegrityError as e:
+        return jsonify({'message': 'DB integrity error occured.'}), 400
+
+    return jsonify({'message': f'Attribute <{attribute}> added to map {id}.'}), 200
 
 
 @maps.route('/<id>/aps', methods=['POST'])
@@ -90,7 +116,7 @@ def add_ap(id):
     """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
 
-    input = request.get_json()
+    input = request.get_json(silent=True)
     if not input or not input.get('aps'):
         return jsonify({'message': 'You have to input a list of MACs that identify the APs you want to add.'}), 400
     

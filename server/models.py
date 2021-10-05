@@ -83,6 +83,9 @@ class AccessPoint(db.Model):
     #the different occurrences this AP was discovered
     discoveries = db.relationship('Discovery', back_populates='access_point')
 
+    #attributes of this AP which were added at runtime by a user
+    attributes = db.relationship('AP_EAV', back_populates='access_point')
+
     def update(self, discovery):
         """
         Update all the values of the AP with the new information of this discovery.
@@ -102,7 +105,27 @@ class AccessPoint(db.Model):
         self.gps_lat = discovery.gps_lat
         self.gps_lon = discovery.gps_lon
 
-    
+
+class AP_EAV(db.Model):
+    """
+    Used to add attributes to access points dynamiccaly during runtime without 
+    the need for schema modification.
+    """
+    mac = db.Column(db.Integer, db.ForeignKey('access_point.mac', ondelete='CASCADE'), primary_key=True) 
+    attribute = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text)
+    type = db.Column(db.String(32))
+
+    access_point = db.relationship('AccessPoint', back_populates='attributes')
+
+    def get_value(self):
+        if type == "Integer":
+            return int(self.value)
+        if type == "Real":
+            return float(self.value)
+        else:
+            return self.value
+
 
 #an AP can be discovered by multiple sniffers - we want to keep track of all occurances 
 class Discovery(db.Model):
@@ -169,5 +192,23 @@ class WardrivingMap(db.Model):
     #all access points we found
     access_points = db.relationship('AccessPoint', secondary=part_of, back_populates='maps')
 
+    #further generic attributes
+    attributes = db.relationship('Map_StringEAV', back_populates='map')
+
     def __repr__(self):
         return f"Capture('{self.id}', '{self.title}')"
+
+class Map_StringEAV(db.Model):
+    """
+    Generic table that can be used to dynamically add metadate/attributs to maps without 
+    having to add columns to the WardrivingMap table. Follows the principle of deferred design.
+    """
+    #these to form the primary key. if attributes with multiple values were to be supported
+    #you could add another column id to the primary key
+    map_id = db.Column(db.Integer, db.ForeignKey('wardriving_map.id', ondelete='CASCADE'), primary_key=True) 
+    attribute = db.Column(db.String(64), primary_key=True)
+    
+    value = db.Column(db.Text)
+
+    map = db.relationship('WardrivingMap', back_populates='attributes')
+    

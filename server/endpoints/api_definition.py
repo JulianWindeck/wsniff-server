@@ -1,7 +1,7 @@
 from marshmallow import fields
 
 from server import ma
-from server.models import AccessPoint, Discovery, WardrivingMap, User, Sniffer
+from server.models import AccessPoint, Discovery, WardrivingMap, User, Sniffer, Map_StringEAV, AP_EAV
 
 """
 Here are all API definitions, meaning that 
@@ -54,6 +54,20 @@ sniffers_schema = SnifferSchema(many=True, exclude=['discoveries'])
 
 ###################################ACCESS POINT###################################################
 
+class AP_EAV_Schema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = AP_EAV
+        load_instance = True
+        #here the magic is happening: do not dump the DB content ...
+        exclude=['type'] #(value is automatically overshadowed by following field)
+    
+    #TODO: data type is somehow wrong :(
+    #... but rather use a method field to output the right data type
+    value = fields.Method("get_value")
+    def get_value(self, eav_obj):
+        #call get_value() method of AP_EAV model object
+        return eav_obj.get_value()
+
 class DiscoverySchema(ma.SQLAlchemyAutoSchema):
     
     class Meta:
@@ -88,13 +102,20 @@ class AccessPointSchema(ma.SQLAlchemyAutoSchema):
     
     #you don't need to transfer 'access_point_mac' since the mac is already part of the AP itself
     discoveries = fields.Nested(DiscoverySchema, many=True, exclude=['access_point_mac'])
+    attributes = fields.Nested(AP_EAV_Schema, many=True)
 
 ap_schema = AccessPointSchema()
 #don't display the discoveries when showing multiple access points
 aps_schema = AccessPointSchema(many=True, exclude=['discoveries'])
 
 
-###################################MAP############################################################
+###########################################MAP####################################################
+
+class MapEAVSchema(ma.SQLAlchemyAutoSchema):
+
+    class Meta:
+        model = Map_StringEAV
+
 
 class MapSchema(ma.SQLAlchemyAutoSchema):
     
@@ -110,6 +131,9 @@ class MapSchema(ma.SQLAlchemyAutoSchema):
     
     access_points = fields.Nested(AccessPointSchema, many=True, exclude=["discoveries"])
     sniffers = fields.Nested(SnifferSchema, many=True, exclude=["maps", "discoveries"])
+    attributes = fields.Nested(MapEAVSchema, many=True)
 
 map_schema = MapSchema()
 maps_schema = MapSchema(many=True)
+
+ 

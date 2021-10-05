@@ -3,7 +3,7 @@ from sqlalchemy import exc
 from marshmallow import ValidationError
 
 from server import db, ma
-from server.models import AccessPoint, Discovery
+from server.models import AccessPoint, Discovery, AP_EAV
 from server.login import admin_required, login_required
 from server.endpoints.api_definition import discovery_schema, discoveries_schema, ap_schema, aps_schema
 
@@ -23,25 +23,35 @@ def get_all_aps():
     output = aps_schema.dump(aps)
     return jsonify({'aps': output})
 
-#it makes no sense to be able to add an access point directly via the API
-# """
-# Create a new Access Point
-# """
-# @aps.route('', methods=['POST'])
-# @login_required
-# def create_ap():
-#     try: 
-#         ap = ap_schema.load(request.get_json())
-#     except ValidationError as e:
-#         return jsonify(e.messages), 400
+@aps.route('/<mac>', methods=["POST"])
+@login_required
+def add_ap_attribute(mac):
+    """
+    Dynamically add access point attributes
+    """
+    ap = AccessPoint.query.filter_by(mac=mac).first_or_404()
+    
+    #get and validate post data
+    input = request.get_json(silent=True)
+    if not input:
+        return jsonify({'message': 'You have to provide an attribute, a value and a type.'}), 400
+    attribute = input.get('attribute')
+    value = input.get('value')
+    type = input.get('type')
+    if not (attribute and value and type):
+        return jsonify({'message': 'You have to provide an attribute, a value and a type.'}), 400
+    if not (type=="String" or type=="Integer" or type=="Real"):
+        return jsonify({'message': 'Attribute type has to be either "String" or "Integer" or "Real".'}), 400
 
-#     try:
-#         db.session.add(ap)
-#         db.session.commit()
-#     except exc.IntegrityError as e:
-#         return jsonify({'message': 'Integrity error occured.'}), 400
+    #add attribute to map
+    eav = AP_EAV(mac=mac, attribute=attribute, value=value, type=type)
+    try:
+        db.session.add(eav)
+        db.session.commit()
+    except exc.IntegrityError as e:
+        return jsonify({'message': 'DB integrity error occured.'}), 400
 
-#     return jsonify({'message': 'New access point created.'})
+    return jsonify({'message': f'Attribute <{attribute}> added to AP {mac}.'}), 200
 
 
 @aps.route('/<mac>', methods=['GET'])
