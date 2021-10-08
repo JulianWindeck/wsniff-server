@@ -77,7 +77,7 @@ class DiscoverySchema(ma.SQLAlchemyAutoSchema):
         #we also want the mac of the AP (which is part of the primary key) to be sent
         include_fk = True
         #fields to exclude (entirely/when producing JSON output/when parsing incoming data)
-        exclude=['sniffer_id']
+        exclude=['sniffer_id', 'map_id']
         load_only = []
         dump_only = ['sniffer']
 
@@ -129,11 +129,11 @@ class MapSchema(ma.SQLAlchemyAutoSchema):
         load_only = []
         dump_only = []
     
-    access_points = fields.Nested(AccessPointSchema, many=True, exclude=["discoveries"])
     sniffers = fields.Nested(SnifferSchema, many=True, exclude=["maps", "discoveries"])
+    discoveries = fields.Nested(DiscoverySchema, many=True)
     attributes = fields.Nested(MapEAVSchema, many=True)
 
 map_schema = MapSchema()
-maps_schema = MapSchema(many=True)
+maps_schema = MapSchema(many=True, exclude=['discoveries'])
 
  

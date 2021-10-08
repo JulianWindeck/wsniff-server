@@ -61,6 +61,10 @@ def get_ap(mac):
     Retrieve the information of a single AP,
     INCLUDING all discoveries linked to that AP
     """
+    # TODO: this is a better place to compute/approximate the GPS lat/lon
+    # using all past discoveries -> then update values of AP in DB
+    # - good because it is only done when the user loads this specific AP
+    # - idea: if you do that, remember to remove update code when adding new discovery
     ap = AccessPoint.query.filter_by(mac=mac).first_or_404()
 
     return jsonify({'ap': ap_schema.dump(ap)})              

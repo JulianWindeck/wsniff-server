@@ -3,8 +3,8 @@ from sqlalchemy import exc
 from marshmallow import ValidationError
 
 from server import db
-from server.models import AccessPoint, WardrivingMap, Sniffer, Map_StringEAV
-from server.endpoints.api_definition import map_schema, maps_schema, sniffers_schema
+from server.models import AccessPoint, WardrivingMap, Sniffer, Discovery, Map_StringEAV
+from server.endpoints.api_definition import map_schema, maps_schema, sniffers_schema, discovery_schema, discoveries_schema
 from server.login import login_required
 
 maps = Blueprint('maps', __name__, url_prefix='/maps')
@@ -53,7 +53,7 @@ def create_map():
     except exc.IntegrityError as e:
         return jsonify({'message': 'Integrity error occured.'}), 400
 
-    return jsonify({'message': 'New map created.'})
+    return jsonify({'message': 'New map created.', 'map_id': map.id})
 
 
 
@@ -107,37 +107,62 @@ def add_map_metadata(id):
     return jsonify({'message': f'Attribute <{attribute}> added to map {id}.'}), 200
 
 
-@maps.route('/<id>/aps', methods=['POST'])
+@maps.route('/<id>', methods=['POST'])
 @login_required
-def add_ap(id):
+def add_discovery(id):
     """
-    Add a list of Access Points to map <id>
-    Expects a list of <mac>-IDs which belong to the APs as JSON input.
+    Create a new discovery and add it to the map.
+    If there is no corresponding Access Point for this discovery, 
+    a new AP is also created in the process.
     """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
 
-    input = request.get_json(silent=True)
-    if not input or not input.get('aps'):
-        return jsonify({'message': 'You have to input a list of MACs that identify the APs you want to add.'}), 400
+    #load Discovery object from JSON input
+    try:
+        discovery = discovery_schema.load(request.get_json())
+    except ValidationError as e:
+        return jsonify(e.messages), 400
+
+    #if this is the first time the AP is discovered, add the AP
+    #check whether there already is an AP with this mac
+    ap = AccessPoint.query.filter_by(mac=discovery.access_point_mac).first()
+
+    if ap:
+        #if there is, add this discovery to the ap
+        #and update the values of the AP
+        ap.update(discovery)
     
-    print(input['aps'])
-    aps = AccessPoint.query.filter(AccessPoint.mac.in_(input['aps'])).all()
-    map.access_points.extend(aps)
+    #if this is the first time the AP is discovered
+    else:
+        #also automatically sets this AP as the access_point of the current discovery
+        ap = AccessPoint(mac=discovery.access_point_mac)
+        ap.update(discovery)
+
+        try:
+            db.session.add(ap)
+            db.session.commit()
+        except exc.IntegrityError as e:
+            return jsonify({'message': 'Integrity error occured when adding AP.'}), 400
+    
+    #as foreign key we can use the current user object
+    discovery.sniffer_id = g.current_user.id
+    #add discovery to map
+    discovery.map_id = map.id
 
     try:
-        db.session.add(map)
+        db.session.add(discovery)
         db.session.commit()
     except exc.IntegrityError as e:
-        return jsonify({'message': 'Integrity error occured.'}), 400
+        return jsonify({'message': 'Integrity error occured when adding discovery.'}), 400
 
-    return jsonify({'message': 'Added access points to map.'}), 200
+    return jsonify({'message': 'New discovery was added.'})
 
 
 @maps.route('/<id>/aps', methods=['GET'])
-@login_required
+#@login_required
 def get_aps(id):
     """
-    Returns all APs that belong to this map that are within the rectangle defined by 
+    Returns all discoveries that belong to this map that are within the rectangle defined by 
     [lat1, lon1] and [lat2, lon2]
     """
     map = WardrivingMap.query.filter_by(id=id).first_or_404()
@@ -147,15 +172,20 @@ def get_aps(id):
     lon1, lon2 = request.args.get('lon1'), request.args.get('lon2')
 
     if not (lat1 and lat2 and lon1 and lon2):
-        return jsonify({'message', 'Please provide lat and lon values'}), 400
+        return jsonify({'message': 'Please provide lat and lon values'}), 400
 
     lat_min, lon_min = min(lat1, lat2), min(lon1, lon2)
     lat_max, lon_max = max(lat1, lat2), max(lon1, lon2)
 
-    AccessPoint.query.join(AccessPoint.maps).filter(WardrivingMap.id == id) \
-        .filter(AccessPoint.lat <= lat_max, AccessPoint.lat >= lat_min,
-                AccessPoint.lon <= lon_max, AccessPoint.lon >= lon_min).all()
-    return
+    #NOTE: (idea) add a route in the future that only displays unique APs
+    # AccessPoint.query.join(AccessPoint.maps).filter(WardrivingMap.id == id) \
+    #     .filter(AccessPoint.lat <= lat_max, AccessPoint.lat >= lat_min,
+    #             AccessPoint.lon <= lon_max, AccessPoint.lon >= lon_min).all()
+    discoveries = Discovery.query.filter_by(map_id=map.id).filter( 
+        Discovery.gps_lat >= lat_min, Discovery.gps_lat <= lat_max, 
+        Discovery.gps_lon >= lon_min, Discovery.gps_lon <= lon_max).all()
+
+    return jsonify({'discoveries': discoveries_schema.dump(discoveries)})
 
 
 

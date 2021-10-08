@@ -28,7 +28,7 @@ git clone https://github.com/JulianWindeck/wsniff-server
 2. Install the software 
 ```
 cd wsniff-server
-python -m venv venv
+python3 -m venv venv
 source ./venv/bin/activate
 pip install -r ./requirements.txt
 python create_db.py

@@ -32,21 +32,12 @@ class User(db.Model):
     def __str__(self):
         return f"User<{self.id}: {self.name} admin={self.admin}>"
 
-#relationship between sniffers and wardriving maps which they helped creating
+# N to M relationship between sniffers and wardriving maps which they helped creating
 participate_in = db.Table(
     'participate_in',
     db.Column('map_id', db.Integer, db.ForeignKey('wardriving_map.id'), primary_key=True),
     db.Column('sniffer_id', db.Integer, db.ForeignKey('sniffer.id'), primary_key=True)
 )
-
-#relationship type between WardrivingMap and AccessPoint,
-#to store which APs should be displayed in which maps
-part_of = db.Table(
-    'part_of', 
-    db.Column('map_id', db.Integer, db.ForeignKey('wardriving_map.id'), primary_key=True), 
-    db.Column('access_point_id', db.Integer, db.ForeignKey('access_point.mac'), primary_key=True)
-)
-
 
 class Encryption():
     OPEN = 0
@@ -57,8 +48,8 @@ class Encryption():
 class AccessPoint(db.Model):
     __tablename__ = 'access_point'
 
-    #it of course makes sense to use the MAC address as the primary key
-    #for better performance, we don't want to store it as a string but rather
+    #Of course, it of makes sense to use the MAC address as the primary key.
+    #But for better performance, we don't want to store it as a string but rather
     #interpret it as an integer:
     #e.g. 00-80-41-ae-fd-7e -> 0x008041AEFD7E and convert this hex number to decimal
     mac = db.Column(db.Integer, primary_key=True)
@@ -78,7 +69,7 @@ class AccessPoint(db.Model):
     gps_lon = db.Column(db.Float, nullable=False)
 
     #all the wardriving maps this AP is part of
-    maps = db.relationship('WardrivingMap', secondary=part_of, back_populates='access_points')
+    # maps = db.relationship('WardrivingMap', secondary=part_of, back_populates='access_points')
 
     #the different occurrences this AP was discovered
     discoveries = db.relationship('Discovery', back_populates='access_point')
@@ -118,6 +109,8 @@ class AP_EAV(db.Model):
 
     access_point = db.relationship('AccessPoint', back_populates='attributes')
 
+    #NOTE: the corresponding POST route for adding AP_EAV objects has to place 
+    #fitting restrictions on the type
     def get_value(self):
         if type == "Integer":
             return int(self.value)
@@ -157,6 +150,10 @@ class Discovery(db.Model):
     sniffer_id = db.Column(db.Integer, db.ForeignKey('sniffer.id'), nullable=False)
     sniffer = db.relationship('Sniffer', back_populates='discoveries')
 
+    #the map of which this discovery is a part 
+    map_id = db.Column(db.Integer, db.ForeignKey('wardriving_map.id'), nullable=False)
+    map = db.relationship('WardrivingMap', back_populates='discoveries')
+
     #the access point this discovery belongs to
     access_point = db.relationship('AccessPoint', back_populates='discoveries')
 
@@ -189,14 +186,17 @@ class WardrivingMap(db.Model):
     #sniffers that contributed to this map
     sniffers = db.relationship('Sniffer', secondary=participate_in, back_populates='maps')
 
+    #all discoveries that were made creating this map
+    discoveries = db.relationship('Discovery', back_populates='map')
+
     #all access points we found
-    access_points = db.relationship('AccessPoint', secondary=part_of, back_populates='maps')
+    # access_points = db.relationship('AccessPoint', secondary=part_of, back_populates='maps')
 
     #further generic attributes
     attributes = db.relationship('Map_StringEAV', back_populates='map')
 
     def __repr__(self):
-        return f"Capture('{self.id}', '{self.title}')"
+        return f"Map('{self.id}', '{self.title}')"
 
 class Map_StringEAV(db.Model):
     """
