@@ -79,6 +79,16 @@ def update_map(id):
 
     return jsonify({'message': 'Map has been updated.'})
 
+@maps.route('/<id>', methods=['DELETE'])
+@login_required
+def delete_map(id):
+    map = WardrivingMap.query.filter_by(id=id).first_or_404()
+
+    db.session.delete(map)
+    db.session.commit()
+
+    return jsonify({'message': 'Map has been deleted.'})
+
 @maps.route('/<id>/meta', methods=["POST"])
 @login_required
 def add_map_metadata(id):
