@@ -183,6 +183,10 @@ def get_aps(id):
 
     if not (lat1 and lat2 and lon1 and lon2):
         return jsonify({'message': 'Please provide lat and lon values'}), 400
+    else:
+        #parse arguments (query params are strings)
+        lat1, lat2 = float(lat1), float(lat2)
+        lon1, lon2 = float(lon1), float(lon2)
 
     lat_min, lon_min = min(lat1, lat2), min(lon1, lon2)
     lat_max, lon_max = max(lat1, lat2), max(lon1, lon2)

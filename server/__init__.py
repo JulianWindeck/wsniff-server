@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
+from flask_cors import CORS
 
 from server.config import ProductionConfig
 
@@ -17,6 +18,8 @@ def create_server(config_class=ProductionConfig):
     db.init_app(app)
     #order matters here: SQLAlchemy has to be initialized before Marshmallow
     ma.init_app(app)
+
+    CORS(app) 
     
     #add endpoints
     from server.endpoints.system import system
