@@ -151,7 +151,7 @@ class Discovery(db.Model):
     sniffer = db.relationship('Sniffer', back_populates='discoveries')
 
     #the map of which this discovery is a part 
-    map_id = db.Column(db.Integer, db.ForeignKey('wardriving_map.id'), nullable=False)
+    map_id = db.Column(db.Integer, db.ForeignKey('wardriving_map.id', ondelete='CASCADE'), nullable=False)
     map = db.relationship('WardrivingMap', back_populates='discoveries')
 
     #the access point this discovery belongs to
@@ -187,7 +187,7 @@ class WardrivingMap(db.Model):
     sniffers = db.relationship('Sniffer', secondary=participate_in, back_populates='maps')
 
     #all discoveries that were made creating this map
-    discoveries = db.relationship('Discovery', back_populates='map')
+    discoveries = db.relationship('Discovery', back_populates='map', cascade="all, delete")
 
     #all access points we found
     # access_points = db.relationship('AccessPoint', secondary=part_of, back_populates='maps')

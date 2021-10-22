@@ -169,7 +169,7 @@ def add_discovery(id):
 
 
 @maps.route('/<id>/aps', methods=['GET'])
-#@login_required
+@login_required
 def get_aps(id):
     """
     Returns all discoveries that belong to this map that are within the rectangle defined by 
